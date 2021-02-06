@@ -106,8 +106,13 @@
                                     if(data.video!=""){
                                         html+='<video style="height:359px;width:100%;" controls src="'+mainURL+'/'+data.video+'"></video>';
                                     }
+
+                                    html+=createLikeSection(data);
                                 html+='</div>';
                             html+='</div>';
+
+                            html+=createCommentsSection(data);
+
                         html+='</div>';
                     html+='</div>';
                     }

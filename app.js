@@ -411,5 +411,383 @@ http.listen(3000,function(){
                 }
             })
         })
+
+        app.post("/toggleLikePost",function(req,res){
+
+            var accessToken=req.fields.accessToken;
+            var _id=req.fields._id;
+        
+
+            database.collection("users").findOne({
+                "accessToken":accessToken
+            },function(err,user){
+                if(user==null){
+                    res.json({
+                        "status":"error",
+                        "message":"User is Logged Out. Please Login to like the post!!"
+                    })
+                }else{
+                    
+                    database.collection("posts").findOne({
+                        "_id":ObjectId(_id)
+                    },function(err,post){
+                        if(post==null){
+                            res.json({
+                                "status":"error",
+                                "message":"Post doesnt exist"
+                            })
+                        }else{
+
+                            var isLiked=false;
+                            for(var a=0;a<post.likers.length;a++){
+                                var liker=post.likers[a];
+
+                                if(liker._id.toString()==user._id.toString()){
+                                    isLiked=true;
+                                    break;
+                                }
+                            }
+
+                            if (isLiked){
+                                
+                                database.collection("posts").updateOne({
+                                    "_id":ObjectId(_id)
+                                },{
+                                    $pull:{
+                                        "likers":{
+                                            "_id":user._id,
+                                        }
+                                    }
+                                },function(err,data){
+                                    database.collection("users").updateOne({
+                                        $and:[{
+                                            "_id":post.user._id
+                                        },{
+                                            "posts._id":post._id
+                                        }]
+                                    },{
+                                        $pull:{
+                                            "posts.$[].likers":{
+                                                "_id":user._id,
+                                            }
+                                        }
+                                    });
+
+                                    res.json({
+                                        "status":"unliked",
+                                        "message":"Post has been unliked"
+                                    })
+                                })
+                            }else{
+                                
+                                database.collection("users").updateOne({
+                                    "_id":post.user._id
+                                },{
+                                    $push:{
+                                        "notifications":{
+                                            "id":ObjectId(),
+                                            "type":"photo_liked",
+                                            "content":user.name+" has liked your photo.",
+                                            "profileImage":user.profileImage,
+                                            "createdAt":new Date().getTime()
+                                        }
+                                    }
+                                });
+
+                                database.collection("posts").updateOne({
+                                    "_id":ObjectId(_id)
+                                },{
+                                    $push:{
+                                        "likers":{
+                                            "_id":user._id,
+                                            "name":user.name,
+                                            "profileImage":user.profileImage
+                                        }
+                                    }
+                                },function(err,data){
+                                    database.collection("users").updateOne({
+                                        $and:[{
+                                            "_id":post.user._id
+                                        },{
+                                            "posts._id":post._id
+                                        }]
+                                    },{
+                                        $push:{
+                                            "posts.$[].likers":{
+                                                "_id":user._id,
+                                                "name":user.name,
+                                                "profileImage":user.profileImage
+                                            }
+                                        }
+                                    })
+                                    
+                                    res.json({
+                                        "status":"success",
+                                        "message":"Post has been liked!!"
+                                    })
+                                })
+                            }
+
+                        }
+                    })
+                }
+            })
+        })
+
+        app.post("/postComment",function(req,res){
+            var accessToken=req.fields.accessToken;
+            var _id=req.fields._id;
+            var comment=req.fields.comment;
+            var createdAt=new Date().getTime();
+
+            database.collection("users").findOne({
+                "accessToken":accessToken
+            },function(err,user){
+                if(user==null){
+                    res.json({
+                        "status":"error",
+                        "message":"User is logged Out. Please login to Comment on this post!!"
+                    })
+                }else{
+                    database.collection("posts").findOne({
+                        "_id":ObjectId(_id)
+                    },function(err,post){
+                        if(post==null){
+                            res.json({
+                                "status":"error",
+                                "message":"Post doesnt exist"
+                            })
+                        }else{
+                            var commentId=ObjectId();
+
+                            database.collection("posts").updateOne({
+                                "_id":ObjectId(_id)
+                            },{
+                                $push:{
+                                    "comments":{
+                                        "_id":commentId,
+                                        "user":{
+                                            "_id":user._id,
+                                            "name":user.name,
+                                            "profileImage":user.profileImage
+                                        },
+                                        "comment":comment,
+                                        "createdAt":createdAt,
+                                        "replies":[]
+                                    }
+                                }
+                            },function(err,data){
+                                if(user._id.toString!=post.user._id.toString()){
+
+                                    database.collection("users").updateOne({
+                                        "_id":post.user._id
+                                    },{
+                                        $push:{
+                                            "notifications":{
+                                                "_id":ObjectId(),
+                                                "type":"new_comment",
+                                                "content":user.name+" has commented on your post.",
+                                                "profileImage":user.profileImage,
+                                                "createdAt":new Date().getTime()
+                                            }
+                                        }
+                                    })
+                                }
+
+                                database.collection("users").updateOne({
+                                    $and:[{
+                                        "_id":post.user._id
+                                    },{
+                                        "posts._id":post._id,
+                                    }]
+                                },{
+                                    $push:{
+                                        "posts.$[].comments":{
+                                            "_id":commentId,
+                                            "user":{
+                                                "_id":user._id,
+                                                "name":user.name,
+                                                "profileImage":user.profileImage
+                                            },
+                                            "comment":comment,
+                                            "createdAt":createdAt,
+                                            "replies":[]
+                                        }
+                                    }
+                                })
+
+                                res.json({
+                                    "status":"success",
+                                    "message":"Comment has been posted."
+                                })
+                            })
+                        }
+                    })
+                }
+            })
+        })
+
+        app.post("/postReply",function(req,res){
+            var accessToken=req.fields.accessToken;
+            var postId=req.fields.postId;
+            var commentId=req.fields.commentId;
+            var reply=req.fields.reply;
+            var createdAt=new Date().getTime();
+
+            database.collection("users").findOne({
+                "accessToken":accessToken 
+            },function(err,user){
+                if(user==null){
+                    res.json({
+                        "status":"error",
+                        "message":"User is logged out,Kindly login to reply to the comment"
+                    })
+                }else{
+                    database.collection("posts").findOne({
+                        "_id":ObjectId(postId)
+                    },function(err,post){
+                        if(post==null){
+                            res.json({
+                                "status":"error",
+                                "message":"Post doesnt exist"
+                            })
+                        }else{
+
+                            var replyId=ObjectId();
+
+                            database.collection("posts").updateOne({
+                                $and:[{
+                                    "_id":ObjectId(postId)
+                                },{
+                                    "comments._id":ObjectId(commentId)
+                                }]
+                            },{
+                                $push:{
+                                    "comments.$.replies":{
+                                        "_id":replyId,
+                                        "user":{
+                                            "_id":user._id,
+                                            "name":user.name,
+                                            "profileImage":user.profileImage
+                                        },
+                                        "reply":reply,
+                                        "createdAt":createdAt
+                                    }
+                                }
+                            },function(err,data){
+
+                                database.collection("users").updateOne({
+                                    $and:[{
+                                        "_id":post.user._id
+                                    },{
+                                        "posts._id":post._id
+                                    },{
+                                        "posts.comments._id":ObjectId(commentId)
+                                    }]
+                                },{
+                                    $push:{
+                                        "posts.$[].comments.$[].replies":{
+                                            "id":replyId,
+                                            "user":{
+                                                "_id":user._id,
+                                                "name":user.name,
+                                                "profileImage":user.profileImage 
+                                            },
+                                            "reply":reply,
+                                            "createdAt":createdAt 
+                                        }
+                                    }
+                                })
+
+                                res.json({
+                                    "status":"success",
+                                    "message":"Reply has been posted"
+                                })
+                            })
+                        }
+                    })
+                }
+            })
+        })
+
+        app.post("/sharePost",function(req,res){
+            var accessToken=req.fields.accessToken;
+            var _id=req.fields._id;
+            var type="shared";
+            var createdAt=new Date().getTime();
+
+            database.collection("users").findOne({
+                "accessToken":accessToken 
+            },function(err,user){
+                if(user==null){
+                    res.json({
+                        "status":"error",
+                        "message":"User is logged out.Please login to share the post."
+                    })
+                }else{
+                    database.collection("posts").findOne({
+                        "_id":ObjectId(_id)
+                    },function(err,post){
+                        if(post==null){
+                            res.json({
+                                "status":"error",
+                                "message":"Post doesnt exist"
+                            })
+                        }else{
+
+                            database.collection("posts").updateOne({
+                                "_id":ObjectId(_id)
+                            },{
+                                $push:{
+                                    "shares":{
+                                        "_id":user._id,
+                                        "name":user.name,
+                                        "profileImage":user.profileImage 
+                                    }
+                                }
+                            },function(err,data){
+                                database.collection("posts").insertOne({
+                                    "caption":post.caption,
+                                    "image":post.image,
+                                    "video":post.video,
+                                    "type":type,
+                                    "createdAt":createdAt,
+                                    "likers":[],
+                                    "comments":[],
+                                    "shares":[],
+                                    "user":{
+                                        "_id":user._id,
+                                        "name":user.name,
+                                        "profileImage":user.profileImage
+                                    }
+                                },function(err,data){
+
+                                    database.collection("users").updateOne({
+                                        $and:[{
+                                            "_id":post.user._id
+                                        },{
+                                            "posts._id":post._id
+                                        }]
+                                    },{
+                                        $push:{
+                                            "posts.$[].shares":{
+                                                "_id":user._id,
+                                                "name":user.name,
+                                                "profileImage":user.profileImage
+                                            }
+                                        }
+                                    })
+
+                                    res.json({
+                                        "status":"success",
+                                        "message":"Post has been shared."
+                                    })
+                                })
+                            })
+                        }
+                    })
+                }
+            })
+        })
     });
 });
