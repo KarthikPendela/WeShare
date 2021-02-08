@@ -25,7 +25,20 @@
                     </ul>
 
                     <ul class="setting-area">
+                        <li>
+                            <a href="#">
+                                <i class="ti-search"></i>
+                            </a>
 
+                            <div class="searched">
+                                <form onsubmit="return false;" class="form-search">
+                                    <input type="type" placeholder="Search Friend">
+                                    <button type="button" data-ripple onclick="onSearch(this);">
+                                        <i class="ti-search"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -34,6 +47,10 @@
             var mainURL="http://localhost:3000";
 
             var months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+            function onSearch(button){
+                window.location.href="/search/"+ button.previousElementSibling.value;
+            }
 
             function createLikeSection(data){
                 
@@ -375,7 +392,7 @@
                 }
             }
 
-            </script>
+        </script>
 
         <style>
             #post-img-preview,
