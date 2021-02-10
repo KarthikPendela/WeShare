@@ -69,9 +69,22 @@
                             showSearchResults();
                         }
 
-                        if(typeof isFriends!="undefined" && isFriends){
+                        if(typeof isFriends!=="undefined" && isFriends){
                             showFriends();
                         }
+
+                        if(typeof isPages!=="undefined" && isPages){
+                            getPages();
+                        }
+
+                        if(typeof isPageDetail!=="undefined" && isPageDetail){
+                            getPageDetail();
+                        }
+
+                        if(typeof isRightSidebar!=="undefined" && isRightSidebar){
+                            getMyPages();
+                        }
+
                     }else{
                         localStorage.removeItem("accessToken");
                     }
