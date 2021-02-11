@@ -85,6 +85,14 @@
                             getMyPages();
                         }
 
+                        if(typeof isGroups!=="undefined" && isGroups){
+                            getGroups();
+                        }
+
+                        if(typeof isGroupDetail!=="undefined" && isGroupDetail){
+                            getGroupDetail();
+                        }
+
                     }else{
                         localStorage.removeItem("accessToken");
                     }
