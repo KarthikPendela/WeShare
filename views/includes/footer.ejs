@@ -93,6 +93,9 @@
                             getGroupDetail();
                         }
 
+                        if(typeof isNotifications!=="undefined" && isNotifications){
+                            showNotifications();
+                        }
                     }else{
                         localStorage.removeItem("accessToken");
                     }

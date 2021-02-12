@@ -505,6 +505,16 @@ http.listen(3000,function(){
                         ids.push(user.pages[a]._id);
                     }
 
+                    for(var a=0;a<user.groups.length;a++){
+                        if(user.groups[a].status=="Accepted"){
+                            ids.push(user.groups[a]._id);
+                        }
+                    }
+
+                    for(var a=0;a<user.friends.length;a++){
+                        ids.push(user.friends[a]._id);
+                    }
+
                     database.collection("posts").find({
                         "user._id":{
                             $in:ids
@@ -1801,7 +1811,7 @@ http.listen(3000,function(){
                                                 "notifications":{
                                                     "_id":ObjectId(),
                                                     "type":"group_join_request",
-                                                    "content":user.name +"sent a request to join your group",
+                                                    "content":user.name +" sent a request to join your group",
                                                     "profileImage":user.profileImage,
                                                     "groupId":group._id,
                                                     "userId":user._id,
@@ -1826,6 +1836,166 @@ http.listen(3000,function(){
 
         app.get("/notifications",function(req,res){
             res.render("notifications");
+        })
+
+        app.post("/acceptRequestJoinGroup",function(req,res){
+            var accessToken=req.fields.accessToken;
+            var _id=req.fields._id;
+            var groupId=req.fields.groupId;
+            var userId=req.fields.userId;
+
+            database.collection("users").findOne({
+                "accessToken":accessToken
+            },function(err,user){
+                if(user==null){
+                    res.json({
+                        "status":"error",
+                        "message":"User is logged out. Please login again"
+                    })
+                }else{
+
+                    database.collection("groups").findOne({
+                        "_id":ObjectId(groupId)
+                    },function(err,group){
+                        if(group==null){
+                            res.json({
+                                "status":"error",
+                                "message":"Group doesnt exist"
+                            })
+                        }else{
+
+                            if(group.user._id.toString()!=user._id.toString()){
+                                res.json({
+                                    "status":"error",
+                                    "message":"Sorry you are not the owner of this group"
+                                });
+                                return;
+                            }
+
+                            database.collection("groups").updateOne({
+                                $and:[{
+                                    "_id":group._id 
+                                },{
+                                    "members._id":ObjectId(userId)
+                                }]
+                            },{
+                                $set:{
+                                    "members.$.status":"Accepted"
+                                }
+                            },function(err,data){
+
+                                database.collection("users").updateOne({
+                                    $and:[{
+                                        "accessToken":accessToken
+                                    },{
+                                        "notifications.groupId":group._id 
+                                    }]
+                                },{
+                                    $set:{
+                                        "notifications.$.status":"Accepted"
+                                    }
+                                },function(err,data){
+
+                                    database.collection("users").updateOne({
+                                        $and:[{
+                                            "_id":ObjectId(userId)
+                                        },{
+                                            "groups._id":group._id
+                                        }]
+                                    },{
+                                        $set:{
+                                            "groups.$.status":"Accepted"
+                                        }
+                                    },function(err,data){
+
+                                        res.json({
+                                            "status":"success",
+                                            "message":"Group join request has been accepted"
+                                        })
+                                    })
+                                })
+                            })
+                        }
+                    })
+                }
+            })
+        })
+
+        app.post("/rejectRequestJoinGroup",function(req,res){
+            var accessToken=req.fields.accessToken;
+            var _id=req.fields._id;
+            var groupId=req.fields.groupId;
+            var userId=req.fields.userId;
+
+            database.collection("users").findOne({
+                "accessToken":accessToken
+            },function(err,user){
+                if(user==null){
+                    res.json({
+                        "status":"error",
+                        "message":"User is loggrd out.Please login again"
+                    })
+                }else{
+
+                    database.collection("groups").findOne({
+                        "_id":ObjectId(groupId)
+                    },function(err,group){
+                        if(group==null){
+                            res.json({
+                                "status":"error",
+                                "message":"Group does not exist"
+                            })
+                        }else{
+
+                            if(group.user._id.toString()==user._id.toString()){
+                                res.json({
+                                    "status":"error",
+                                    "message":"Sorry you dont own this group"
+                                });
+                                return;
+                            }
+
+                            database.collection("groups").updateOne({
+                                "_id":group._id
+                            },{
+                                $pull:{
+                                    "members":{
+                                        "_id":ObjectId(userId)
+                                    }
+                                }
+                            },function(err,data){
+
+                                database.collection("users").updateOne({
+                                    "accessToken":accessToken
+                                },{
+                                    $pull:{
+                                        "notifications":{
+                                            "groupId":group._id
+                                        }
+                                    }
+                                },function(err,data){
+
+                                    database.collection("users").updateOne({
+                                        "_id":ObjectId(userId)
+                                    },{
+                                        $pull:{
+                                            "groups":{
+                                                "_id":group._id
+                                            }
+                                        }
+                                    },function(err,data){
+
+                                        res.json({
+                                            "status":"success",
+                                            "message":"Group join request has been rejected"
+                                        })
+                                    })
+                                })
+                            })
+                        }
+                    })
+                }
+            })
         })
     });
 });
